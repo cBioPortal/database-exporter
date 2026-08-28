@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cBioPortal Public Database Dumps</title>
+  </head>
+  <body>
+    <h1>cBioPortal Public Database Dumps</h1>
+    <p class="caption">
+      Weekly exports of the cBioPortal public database, available for download
+      and self-hosting. Please note that these exports originate from ClickHouse Cloud and are adapted for
+        self-hosted ClickHouse. Differences between ClickHouse versions or
+        environments may cause restore or compatibility issues. For help, contact
+        <a href="mailto:cbioportal@googlegroups.com"
+        >cbioportal@googlegroups.com</a
+        >.
+    </p>
+
+    <details class="restore-instructions">
+      <summary class="details-summary">
+        <i
+          class="details-caret"
+          data-lucide="chevron-right"
+          aria-hidden="true"
+        ></i>
+        How to download and restore (ClickHouse)
+      </summary>
+      <ol>
+        <li>
+          Pick a dump below and download the Parquet files you need. Each table
+          is a separate file, so you can take only the tables you care about.
+        </li>
+        <li>
+          Create a target database, then run <code>schema.sql</code> against it
+          to create all tables and views:
+          <pre><code>clickhouse-client --query "CREATE DATABASE &lt;database&gt;"
+clickhouse-client --database &lt;database&gt; --queries-file schema.sql</code></pre>
+        </li>
+        <li>
+          Load each Parquet file into the corresponding table:
+          <pre><code>clickhouse-client --database &lt;database&gt; --query "
+  INSERT INTO &lt;table&gt;
+  SELECT * FROM file('&lt;table&gt;.parquet', 'Parquet')
+"</code></pre>
+        </li>
+        <li>
+          Parameterized views are included in <code>schema.sql</code> and will
+          work automatically once the base tables are populated.
+        </li>
+        <li>
+          Use <code>manifest.json</code> to verify the exported Parquet row
+          counts after restore.
+        </li>
+      </ol>
+      <p>
+        For version-specific setup and further guidance about importing data, see the
+        <a
+          href="https://clickhouse.com/docs"
+          target="_blank"
+          rel="noopener noreferrer"
+          >official ClickHouse documentation</a
+        >.
+      </p>
+    </details>
+
+    <h2>ClickHouse (Parquet)</h2>
+    <p class="caption">
+      One Parquet file per table. Expand a dump to list its tables. Dumps run
+      weekly, and only the most recent exports are retained &mdash; older ones
+      are removed automatically, so download anything you need to retain.
+    </p>
+    <div class="dumps" id="dumps"></div>
+
+    <h2>Hugging Face</h2>
+    <p class="caption">
+      We also publish the ClickHouse dumps in the
+      <a
+        href="https://huggingface.co/datasets/cBioPortal/publicDatabase"
+        target="_blank"
+        rel="noopener noreferrer"
+        >cBioPortal Public Database dataset on Hugging Face</a
+      >. Each table is a separate dataset configuration that can be browsed,
+      filtered, searched, or queried in Data Studio.
+    </p>
+
+    <h2>Legacy MySQL</h2>
+    <p class="caption">
+      Archived <code>mysqldump</code> exports, kept for backwards compatibility.
+      No longer updated.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Schema Version</th>
+          <th>Format</th>
+          <th>Size</th>
+          <th>Download</th>
+        </tr>
+      </thead>
+      <tbody id="mysql"></tbody>
+    </table>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
