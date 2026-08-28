@@ -98,18 +98,14 @@ jobs:
             --content-type "text/html; charset=utf-8" \
             --only-show-errors
 
-      - name: Invalidate frontend cache
+      - name: Request frontend cache invalidation
         shell: bash
         env:
           AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
           set -euo pipefail
-          invalidation_id=$(aws cloudfront create-invalidation \
+          aws cloudfront create-invalidation \
             --distribution-id "${AWS_CLOUDFRONT_DISTRIBUTION_ID}" \
             --paths "/" "/index.html" \
-            --query Invalidation.Id \
-            --output text)
-
-          aws cloudfront wait invalidation-completed \
-            --distribution-id "${AWS_CLOUDFRONT_DISTRIBUTION_ID}" \
-            --id "${invalidation_id}"
+            --query "Invalidation.{Id:Id,Status:Status}" \
+            --output table
