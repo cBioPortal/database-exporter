@@ -1,0 +1,115 @@
+name: Deploy frontend
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_PROFILE: ${{ secrets.AWS_PROFILE }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      SAML2AWS_VERSION: 2.36.18
+      SAML2AWS_SHA256: 57cb099cff2c9d8526a579a0c5668be76a481905199cf99df5976a96124bb17f
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install saml2aws
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/saml2aws.tar.gz"
+          curl --fail --location --silent --show-error --retry 3 \
+            "https://github.com/Versent/saml2aws/releases/download/v${SAML2AWS_VERSION}/saml2aws_${SAML2AWS_VERSION}_linux_amd64.tar.gz" \
+            --output "${archive}"
+          echo "${SAML2AWS_SHA256}  ${archive}" | sha256sum --check
+          tar --extract --gzip --file "${archive}" --directory "${RUNNER_TEMP}" saml2aws
+          sudo install --mode 0755 "${RUNNER_TEMP}/saml2aws" /usr/local/bin/saml2aws
+          saml2aws --version
+
+      - name: Authenticate to AWS
+        shell: bash
+        env:
+          SAML2AWS_PASSWORD: ${{ secrets.SAML2AWS_PASSWORD }}
+          SAML2AWS_ROLE: ${{ secrets.SAML2AWS_ROLE }}
+          SAML2AWS_URL: ${{ secrets.SAML2AWS_URL }}
+          SAML2AWS_USERNAME: ${{ secrets.SAML2AWS_USERNAME }}
+        run: |
+          set -euo pipefail
+          saml2aws configure \
+            --idp-provider=Ping \
+            --mfa=Auto \
+            --url="${SAML2AWS_URL}" \
+            --aws-urn=urn:amazon:webservices \
+            --session-duration=900 \
+            --skip-prompt \
+            --profile="${AWS_PROFILE}"
+
+          saml2aws login \
+            --profile="${AWS_PROFILE}" \
+            --force \
+            --skip-prompt
+
+          authenticated_account=$(aws sts get-caller-identity \
+            --query Account \
+            --output text)
+          if [[ "${authenticated_account}" != "${AWS_ACCOUNT_ID}" ]]; then
+            echo "Authenticated to unexpected AWS account ${authenticated_account}" >&2
+            exit 1
+          fi
+
+      - name: Upload frontend
+        shell: bash
+        env:
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        run: |
+          set -euo pipefail
+          aws s3 sync dist/assets "s3://${AWS_S3_BUCKET}/assets" \
+            --cache-control "public,max-age=31536000,immutable" \
+            --only-show-errors
+
+          aws s3 cp dist/index.html "s3://${AWS_S3_BUCKET}/index.html" \
+            --cache-control "public,max-age=300" \
+            --content-type "text/html; charset=utf-8" \
+            --only-show-errors
+
+      - name: Invalidate frontend cache
+        shell: bash
+        env:
+          AWS_CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          set -euo pipefail
+          invalidation_id=$(aws cloudfront create-invalidation \
+            --distribution-id "${AWS_CLOUDFRONT_DISTRIBUTION_ID}" \
+            --paths "/" "/index.html" \
+            --query Invalidation.Id \
+            --output text)
+
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "${AWS_CLOUDFRONT_DISTRIBUTION_ID}" \
+            --id "${invalidation_id}"
