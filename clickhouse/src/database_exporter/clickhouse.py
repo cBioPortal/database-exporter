@@ -6,6 +6,7 @@ from typing import Any
 import clickhouse_connect
 from clickhouse_connect.driver.client import Client
 from clickhouse_connect.driver.exceptions import ClickHouseError
+from clickhouse_connect.driver.summary import QuerySummary
 
 from .config import Config
 from .storage import AwsCredentials
@@ -129,11 +130,11 @@ class ClickHouseDatabase:
         table_name: str,
         s3_url: str,
         credentials: AwsCredentials,
-    ) -> None:
+    ) -> int:
         database = quote_identifier(self._database_name)
         table = quote_identifier(table_name)
         try:
-            self._client.command(
+            summary = self._client.command(
                 f"""
                 INSERT INTO FUNCTION s3(
                     %(s3_url)s,
@@ -156,6 +157,26 @@ class ClickHouseDatabase:
             raise ExportCommandError(
                 f"ClickHouse failed to export table {table_name}"
             ) from None
+        if not isinstance(summary, QuerySummary):
+            raise ExportCommandError(
+                f"ClickHouse did not return an export summary for table {table_name}"
+            )
+        written_rows = summary.summary.get("written_rows")
+        if written_rows is None:
+            raise ExportCommandError(
+                f"ClickHouse did not report rows written for table {table_name}"
+            )
+        try:
+            rows = int(written_rows)
+        except ValueError as error:
+            raise ExportCommandError(
+                f"ClickHouse reported an invalid written row count for table {table_name}"
+            ) from error
+        if rows < 0:
+            raise ExportCommandError(
+                f"ClickHouse reported an invalid written row count for table {table_name}"
+            )
+        return rows
 
     def parquet_row_count(
         self,

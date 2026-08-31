@@ -192,7 +192,7 @@ class DatabaseExporter:
             else:
                 log.info("Exporting table: %s", table.name)
                 s3_url = f"{s3_base}/{table.name}.parquet"
-                self._clickhouse.export_table(
+                exported_rows = self._clickhouse.export_table(
                     table.name,
                     s3_url,
                     self._credentials,
@@ -201,6 +201,12 @@ class DatabaseExporter:
                     s3_url,
                     self._credentials,
                 )
+                if rows != exported_rows:
+                    raise RuntimeError(
+                        f"Row count mismatch for {table.name}: "
+                        f"ClickHouse wrote {exported_rows}, Parquet contains {rows}"
+                    )
+                log.info("Validated table: %s (%d rows)", table.name, rows)
 
             manifest_tables.append(
                 {
