@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import hashlib
+import os
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
 
 import boto3
+from botocore.exceptions import ClientError
 
-from .config import Config
+
+class S3Config(Protocol):
+    aws_profile: str
+    aws_s3_dump_bucket: str
+    aws_s3_region: str
 
 
 class StorageError(RuntimeError):
@@ -25,7 +34,7 @@ class S3Object:
 
 
 class S3Storage:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: S3Config) -> None:
         self._bucket = config.aws_s3_dump_bucket
         self._session = boto3.Session(
             profile_name=config.aws_profile,
@@ -62,6 +71,71 @@ class S3Storage:
         if cache_control is not None:
             request["CacheControl"] = cache_control
         self._client.put_object(**request)
+
+    def get_text(self, key: str) -> str:
+        response = self._client.get_object(Bucket=self._bucket, Key=key)
+        body = response["Body"]
+        try:
+            value = body.read()
+        finally:
+            body.close()
+        if not isinstance(value, bytes):
+            raise StorageError(f"S3 returned invalid content for {key}")
+        try:
+            return value.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise StorageError(f"S3 object is not UTF-8 text: {key}") from error
+
+    def get_optional_text(self, key: str) -> str | None:
+        try:
+            return self.get_text(key)
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code")
+            if code in {"NoSuchKey", "404"}:
+                return None
+            raise
+
+    def download(
+        self,
+        key: str,
+        destination: Path,
+        expected_size: int,
+    ) -> str:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f"{destination.name}.part")
+        temporary.unlink(missing_ok=True)
+
+        response = self._client.get_object(Bucket=self._bucket, Key=key)
+        size = response.get("ContentLength")
+        if size != expected_size:
+            response["Body"].close()
+            raise StorageError(
+                f"S3 object size mismatch for {key}: "
+                f"expected {expected_size}, got {size}"
+            )
+
+        digest = hashlib.sha256()
+        written = 0
+        body = response["Body"]
+        try:
+            with temporary.open("wb") as output:
+                for chunk in body.iter_chunks(chunk_size=8 * 1024 * 1024):
+                    if chunk:
+                        output.write(chunk)
+                        digest.update(chunk)
+                        written += len(chunk)
+            if written != expected_size:
+                raise StorageError(
+                    f"S3 download size mismatch for {key}: "
+                    f"expected {expected_size}, got {written}"
+                )
+            os.replace(temporary, destination)
+        except Exception:
+            temporary.unlink(missing_ok=True)
+            raise
+        finally:
+            body.close()
+        return digest.hexdigest()
 
     def list_prefix(self, prefix: str) -> list[S3Object]:
         key_prefix = f"{prefix}/"

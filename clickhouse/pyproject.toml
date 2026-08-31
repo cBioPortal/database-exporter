@@ -1,11 +1,12 @@
 [project]
 name = "cbioportal-database-exporter"
 version = "0.1.0"
-description = "Export the public cBioPortal ClickHouse database to S3"
+description = "Publish the public cBioPortal ClickHouse database to S3 and Hugging Face"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "boto3==1.43.83",
   "clickhouse-connect==1.7.2",
+  "huggingface-hub==1.29.0",
 ]
 
 [project.scripts]
