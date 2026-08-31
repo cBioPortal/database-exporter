@@ -118,7 +118,11 @@ class ClickHouseDatabase:
     def show_create_table(self, table_name: str) -> str:
         database = quote_identifier(self._database_name)
         table = quote_identifier(table_name)
-        return str(self._client.command(f"SHOW CREATE TABLE {database}.{table}")).rstrip()
+        ddl = self._client.raw_query(
+            f"SHOW CREATE TABLE {database}.{table}",
+            fmt="RawBLOB",
+        )
+        return ddl.decode("utf-8").rstrip()
 
     def export_table(
         self,
