@@ -157,15 +157,35 @@ class ClickHouseDatabase:
                 f"ClickHouse failed to export table {table_name}"
             ) from None
 
-    def parquet_row_count(self, s3_url: str) -> int:
-        value = self._client.command(
-            """
-            SELECT count()
-            FROM s3(%(s3_url)s, 'Parquet')
-            SETTINGS optimize_count_from_files = 1
-            """,
-            parameters={"s3_url": s3_url},
-        )
+    def parquet_row_count(
+        self,
+        s3_url: str,
+        credentials: AwsCredentials,
+    ) -> int:
+        try:
+            value = self._client.command(
+                """
+                SELECT count()
+                FROM s3(
+                    %(s3_url)s,
+                    %(access_key_id)s,
+                    %(secret_access_key)s,
+                    %(session_token)s,
+                    'Parquet'
+                )
+                SETTINGS optimize_count_from_files = 1
+                """,
+                parameters={
+                    "s3_url": s3_url,
+                    "access_key_id": credentials.access_key_id,
+                    "secret_access_key": credentials.secret_access_key,
+                    "session_token": credentials.session_token,
+                },
+            )
+        except ClickHouseError:
+            raise ExportCommandError(
+                f"ClickHouse failed to validate table export at {s3_url}"
+            ) from None
         try:
             rows = int(value)
         except (TypeError, ValueError) as error:

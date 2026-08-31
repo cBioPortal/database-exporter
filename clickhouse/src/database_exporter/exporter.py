@@ -197,7 +197,10 @@ class DatabaseExporter:
                     s3_url,
                     self._credentials,
                 )
-                rows = self._clickhouse.parquet_row_count(s3_url)
+                rows = self._clickhouse.parquet_row_count(
+                    s3_url,
+                    self._credentials,
+                )
 
             manifest_tables.append(
                 {
