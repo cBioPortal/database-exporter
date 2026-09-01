@@ -208,8 +208,6 @@ class HuggingFacePublisher:
         metadata = {
             "README.md": dataset_card(
                 self._config.hf_dataset_repo,
-                snapshot.dump_dir,
-                snapshot.source_url,
                 snapshot.schema_version,
                 snapshot.clickhouse_version,
                 snapshot.table_names,
