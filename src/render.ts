@@ -3,6 +3,7 @@ import {
   Clock,
   createIcons,
   ExternalLink,
+  Info,
   TriangleAlert,
 } from "lucide";
 
@@ -149,8 +150,12 @@ function renderDump(
     html += "</p>\n";
   }
 
+  const exploreHeader = isLatest
+    ? "Explore"
+    : '<span class="explore-heading">Explore<span class="explore-tooltip" tabindex="0" aria-label="Explore on Hugging Face is only available for the latest dump." data-tooltip="Explore on Hugging Face is only available for the latest dump."><i class="explore-tooltip-icon" data-lucide="info" aria-hidden="true"></i></span></span>';
+
   html += '  <div class="table-scroll">\n    <table>\n';
-  html += `      <thead><tr><th>Table (${tables.length})</th><th>Size (${human(total)})</th><th>Download</th><th>Explore</th></tr></thead>\n`;
+  html += `      <thead><tr><th>Table (${tables.length})</th><th>Size (${human(total)})</th><th>Download</th><th>${exploreHeader}</th></tr></thead>\n`;
   html += "      <tbody>\n";
   for (const file of tables) {
     const table = file.name.replace(/\.parquet$/, "");
@@ -226,7 +231,9 @@ export function renderPage(
 }
 
 export function renderIcons(): void {
-  createIcons({ icons: { ChevronRight, Clock, ExternalLink, TriangleAlert } });
+  createIcons({
+    icons: { ChevronRight, Clock, ExternalLink, Info, TriangleAlert },
+  });
 }
 
 export function renderLoadError(error: unknown): void {

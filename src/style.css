@@ -304,3 +304,55 @@ a:hover {
   background: #e6bb00;
   text-decoration: none;
 }
+
+.explore-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.explore-tooltip {
+  position: relative;
+  display: inline-flex;
+  color: #57606a;
+  cursor: help;
+  border-radius: 3px;
+}
+
+.explore-tooltip:focus-visible {
+  outline: 2px solid #0969da;
+  outline-offset: 2px;
+}
+
+.explore-tooltip-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.explore-tooltip::after {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -8px;
+  z-index: 2;
+  width: 220px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  background: #24292f;
+  color: #fff;
+  content: attr(data-tooltip);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+
+.explore-tooltip:hover::after,
+.explore-tooltip:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
