@@ -10,7 +10,7 @@ from huggingface_hub.errors import HfHubHTTPError
 from .clickhouse import ClickHouseDatabase
 from .config import Config, ConfigurationError, PublisherConfig
 from .exporter import DatabaseExporter
-from .huggingface import DatasetViewer, HuggingFaceRepository
+from .huggingface import HuggingFaceRepository
 from .publisher import HuggingFacePublisher
 from .storage import S3Storage
 
@@ -47,7 +47,6 @@ def _publish_huggingface() -> None:
         config,
         storage,
         HuggingFaceRepository(config),
-        DatasetViewer(config),
     ).run()
 
 

@@ -74,8 +74,9 @@ Run this as a separate job only after the S3 exporter succeeds. The publisher
 uses `dumps.json` and its latest manifest hash as the source-of-truth snapshot,
 uploads each Parquet file to a resumable staging branch, and promotes the
 complete dataset to `main` in one commit. It writes `huggingface.json` to the S3
-bucket only after every table configuration is available from the Hugging Face
-Dataset Viewer.
+bucket after the verified staging revision has been promoted to `main`. Dataset
+Viewer indexing continues asynchronously and is not part of the publication
+job.
 
 Required settings:
 
@@ -85,9 +86,7 @@ Required settings:
 
 Optional settings are `AWS_S3_REGION` (`us-east-1`),
 `HF_DATASET_REPO` (`cBioPortal/publicDatabase`), `HF_WORK_DIR`
-(`/tmp/dump/huggingface`), `HF_VIEWER_URL`
-(`https://datasets-server.huggingface.co`), `HF_VIEWER_POLL_SECONDS` (`30`),
-and `HF_VIEWER_TIMEOUT_SECONDS` (`7200`).
+(`/tmp/dump/huggingface`).
 
 For cluster uploads, set `HF_XET_CACHE` to a local disk path and provision the
 work/cache volume for the largest Parquet object plus Xet working space. The

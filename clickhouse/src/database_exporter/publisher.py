@@ -13,7 +13,6 @@ from urllib.parse import quote
 from .config import PublisherConfig
 from .huggingface import (
     MANAGED_METADATA_FILES,
-    DatasetViewer,
     HuggingFaceRepository,
     dataset_card,
     json_text,
@@ -63,12 +62,10 @@ class HuggingFacePublisher:
         config: PublisherConfig,
         storage: S3Storage,
         repository: HuggingFaceRepository,
-        viewer: DatasetViewer,
     ) -> None:
         self._config = config
         self._repository = repository
         self._storage = storage
-        self._viewer = viewer
 
     def run(self) -> None:
         self._config.work_dir.mkdir(parents=True, exist_ok=True)
@@ -106,10 +103,9 @@ class HuggingFacePublisher:
                 stage_branch,
             )
 
-        flags = self._viewer.wait_until_ready(snapshot.table_names)
         if self._repository.main_revision() != promoted_revision:
             raise RuntimeError(
-                "Hugging Face main changed while Dataset Viewer was indexing"
+                "Hugging Face main changed during publication"
             )
 
         self._repository.delete_stage(stage_branch)
@@ -126,7 +122,6 @@ class HuggingFacePublisher:
             "dump_dir": snapshot.dump_dir,
             "manifest_sha256": snapshot.manifest_sha256,
             "published_at": utc_timestamp(),
-            "viewer_features": flags,
         }
         self._storage.put_text(
             "huggingface.json",
